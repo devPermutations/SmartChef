@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartChef</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .chat-bubble-user { background: #dcfce7; border-radius: 18px 18px 4px 18px; }
+    .chat-bubble-ai { background: #f3f4f6; border-radius: 18px 18px 18px 4px; }
+    .tab-active { border-bottom: 3px solid #16a34a; color: #16a34a; font-weight: 600; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .loader { border: 3px solid #e5e7eb; border-top: 3px solid #16a34a; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Hide scrollbar but keep functionality */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Auth Screen -->
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-brand-700">SmartChef</h1>
+        <p class="text-gray-500 mt-2">Your personal chef & shopping assistant</p>
+      </div>
+
+      <!-- Login Form -->
+      <div id="login-form">
+        <h2 class="text-xl font-semibold mb-4">Sign In</h2>
+        <div id="login-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
+        <input id="login-email" type="email" placeholder="Email" class="w-full border rounded-lg p-3 mb-3 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <input id="login-password" type="password" placeholder="Password" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <button onclick="handleLogin()" class="w-full bg-brand-600 text-white rounded-lg p-3 font-semibold hover:bg-brand-700 transition">Sign In</button>
+        <p class="text-center mt-4 text-gray-500">Don't have an account? <a href="#" onclick="showRegister()" class="text-brand-600 font-medium">Sign Up</a></p>
+      </div>
+
+      <!-- Register Form -->
+      <div id="register-form" class="hidden">
+        <h2 class="text-xl font-semibold mb-4">Create Account</h2>
+        <div id="register-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
+        <input id="reg-name" type="text" placeholder="Full Name" class="w-full border rounded-lg p-3 mb-3 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <input id="reg-email" type="email" placeholder="Email" class="w-full border rounded-lg p-3 mb-3 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <input id="reg-password" type="password" placeholder="Password (min 6 chars)" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <button onclick="handleRegister()" class="w-full bg-brand-600 text-white rounded-lg p-3 font-semibold hover:bg-brand-700 transition">Create Account</button>
+        <p class="text-center mt-4 text-gray-500">Already have an account? <a href="#" onclick="showLogin()" class="text-brand-600 font-medium">Sign In</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app-screen" class="hidden min-h-screen flex flex-col">
+
+    <!-- Top Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <h1 class="text-xl font-bold text-brand-700">SmartChef</h1>
+        <div class="flex items-center gap-3">
+          <span id="user-name" class="text-sm text-gray-600 hidden sm:inline"></span>
+          <button onclick="showProfile()" class="w-9 h-9 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center text-sm hover:bg-brand-200 transition" id="avatar-btn">U</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="bg-white border-b sticky top-[52px] z-20">
+      <div class="max-w-5xl mx-auto flex">
+        <button onclick="switchTab('recipes')" class="flex-1 py-3 text-center text-sm transition tab-active" data-tab="recipes">Recipes</button>
+        <button onclick="switchTab('shopping')" class="flex-1 py-3 text-center text-sm text-gray-500 transition" data-tab="shopping">Shopping</button>
+        <button onclick="switchTab('stores')" class="flex-1 py-3 text-center text-sm text-gray-500 transition" data-tab="stores">Stores</button>
+        <button onclick="switchTab('chat')" class="flex-1 py-3 text-center text-sm text-gray-500 transition" data-tab="chat">Chef AI</button>
+      </div>
+    </nav>
+
+    <!-- Content Area -->
+    <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-4 pb-20">
+
+      <!-- Recipes Tab -->
+      <div id="tab-recipes" class="fade-in">
+        <!-- Search & Filters -->
+        <div class="mb-4">
+          <div class="relative">
+            <input id="recipe-search" type="text" placeholder="Search recipes..." class="w-full border rounded-xl p-3 pl-10 focus:ring-2 focus:ring-brand-500 focus:outline-none" oninput="debounceSearch()">
+            <svg class="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="mb-4 overflow-x-auto no-scrollbar">
+          <div class="flex gap-2 pb-2">
+            <select id="filter-cuisine" class="border rounded-full px-4 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none" onchange="applyFilters()">
+              <option value="">All Cuisines</option>
+            </select>
+            <select id="filter-dietary" class="border rounded-full px-4 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none" onchange="applyFilters()">
+              <option value="">All Diets</option>
+            </select>
+            <select id="filter-difficulty" class="border rounded-full px-4 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none" onchange="applyFilters()">
+              <option value="">Any Difficulty</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Recipe Grid -->
+        <div id="recipe-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="text-center py-12 col-span-full">
+            <div class="loader mx-auto mb-3"></div>
+            <p class="text-gray-400">Loading recipes...</p>
+          </div>
+        </div>
+
+        <!-- Load More -->
+        <div id="load-more-container" class="hidden text-center mt-6">
+          <button onclick="loadMoreRecipes()" class="bg-white border-2 border-brand-600 text-brand-600 rounded-full px-8 py-2 font-medium hover:bg-brand-50 transition">Load More</button>
+        </div>
+      </div>
+
+      <!-- Shopping Tab -->
+      <div id="tab-shopping" class="hidden fade-in">
+        <div id="shopping-empty" class="text-center py-16">
+          <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+          <h3 class="text-lg font-medium text-gray-500">No shopping list yet</h3>
+          <p class="text-gray-400 mt-1">Select a recipe to generate a shopping list</p>
+        </div>
+        <div id="shopping-content" class="hidden"></div>
+      </div>
+
+      <!-- Stores Tab -->
+      <div id="tab-stores" class="hidden fade-in">
+        <div id="stores-list"></div>
+      </div>
+
+      <!-- Chat Tab -->
+      <div id="tab-chat" class="hidden fade-in flex flex-col" style="height: calc(100vh - 180px);">
+        <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pb-4">
+          <div class="chat-bubble-ai p-4 max-w-[85%]">
+            <p class="text-sm">Hi! I'm your SmartChef assistant. I can help you decide what to cook, find recipes based on what you have, and remember your preferences. What are you in the mood for?</p>
+          </div>
+        </div>
+        <div class="border-t bg-white p-3 flex gap-2">
+          <input id="chat-input" type="text" placeholder="Ask me anything about cooking..." class="flex-1 border rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" onkeydown="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()" class="bg-brand-600 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-700 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          </button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Recipe Detail Modal -->
+  <div id="recipe-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center">
+    <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto">
+      <div id="recipe-modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center">
+    <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold">Profile</h2>
+        <button onclick="closeProfile()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+      </div>
+      <div id="profile-content"></div>
+    </div>
+  </div>
+
+  <!-- Shopping Optimization Modal -->
+  <div id="optimize-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center">
+    <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold">Shopping Plan</h2>
+        <button onclick="closeOptimize()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+      </div>
+      <div id="optimize-content"></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+node_modules/
+.git/
+data/*.db*
+logs/
+.env
+.claude/
+__pycache__/
+recipes/__pycache__/
+nul
+*.md
+.dockerignore
+Dockerfile
+docker-compose.yml

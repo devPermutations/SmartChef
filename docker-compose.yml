@@ -1,0 +1,14 @@
+services:
+  smartchef:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      - JWT_SECRET=change-me-to-a-secure-random-string
+      - LLM_PROVIDER=demo
+    restart: unless-stopped
