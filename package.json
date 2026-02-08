@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",
+    "puppeteer": "^24.37.2",
     "tailwindcss": "^4.1.18"
   }
 }
