@@ -87,11 +87,45 @@ function initialize() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS recipes (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      origin TEXT,
+      prep_time_minutes INTEGER,
+      cook_time_minutes INTEGER,
+      servings INTEGER,
+      difficulty TEXT,
+      instructions TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS recipe_ingredients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recipe_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      quantity REAL,
+      unit TEXT,
+      category TEXT,
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS recipe_dietary (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recipe_id INTEGER NOT NULL,
+      tag TEXT NOT NULL,
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_memory_user ON user_memory(user_id);
     CREATE INDEX IF NOT EXISTS idx_store_deals_store ON store_deals(store_id);
     CREATE INDEX IF NOT EXISTS idx_store_deals_item ON store_deals(item_name);
     CREATE INDEX IF NOT EXISTS idx_meal_selections_user ON meal_selections(user_id);
+    CREATE INDEX IF NOT EXISTS idx_recipes_origin ON recipes(origin);
+    CREATE INDEX IF NOT EXISTS idx_recipes_difficulty ON recipes(difficulty);
+    CREATE INDEX IF NOT EXISTS idx_recipe_dietary_tag ON recipe_dietary(tag);
+    CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
   `);
 
   return db;

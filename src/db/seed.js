@@ -3,6 +3,8 @@
  * Run with: npm run seed
  */
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const { initialize, getDb } = require('./database');
 
 // Initialize DB
@@ -109,4 +111,55 @@ const insertMany = db.transaction(() => {
 
 insertMany();
 console.log(`Inserted ${dealCount} deals across ${storeIds.length} stores`);
+
+// --- Recipes ---
+const recipeCount = db.prepare('SELECT COUNT(*) AS cnt FROM recipes').get().cnt;
+if (recipeCount === 0) {
+  const recipePath = path.join(__dirname, '..', '..', 'recipes.json');
+  if (fs.existsSync(recipePath)) {
+    const { recipes } = JSON.parse(fs.readFileSync(recipePath, 'utf-8'));
+
+    const insertRecipe = db.prepare(`
+      INSERT INTO recipes (id, name, description, origin, prep_time_minutes, cook_time_minutes, servings, difficulty, instructions)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertIngredient = db.prepare(`
+      INSERT INTO recipe_ingredients (recipe_id, name, quantity, unit, category)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const insertDietary = db.prepare(`
+      INSERT INTO recipe_dietary (recipe_id, tag)
+      VALUES (?, ?)
+    `);
+
+    const seedRecipes = db.transaction(() => {
+      for (const r of recipes) {
+        insertRecipe.run(r.id, r.name, r.description || null, r.origin || null,
+          r.prep_time_minutes || null, r.cook_time_minutes || null,
+          r.servings || null, r.difficulty || null,
+          JSON.stringify(r.instructions || []));
+
+        if (r.ingredients) {
+          for (const ing of r.ingredients) {
+            insertIngredient.run(r.id, ing.name, ing.quantity ?? null, ing.unit || null, ing.category || null);
+          }
+        }
+
+        if (r.dietary) {
+          for (const tag of r.dietary) {
+            insertDietary.run(r.id, tag);
+          }
+        }
+      }
+    });
+
+    seedRecipes();
+    console.log(`Inserted ${recipes.length} recipes`);
+  } else {
+    console.log('recipes.json not found, skipping recipe seed');
+  }
+} else {
+  console.log(`Recipes already seeded (${recipeCount} recipes)`);
+}
+
 console.log('Seed complete!');

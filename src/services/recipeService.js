@@ -1,88 +1,118 @@
-const fs = require('fs');
-const path = require('path');
+const { getDb } = require('../db/database');
 
-let recipeData = null;
+function assembleRecipe(row) {
+  const db = getDb();
+  const ingredients = db.prepare(
+    'SELECT name, quantity, unit, category FROM recipe_ingredients WHERE recipe_id = ?'
+  ).all(row.id);
+  const dietary = db.prepare(
+    'SELECT tag FROM recipe_dietary WHERE recipe_id = ?'
+  ).all(row.id).map(d => d.tag);
 
-function loadRecipes() {
-  if (recipeData) return recipeData;
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    origin: row.origin,
+    dietary,
+    prep_time_minutes: row.prep_time_minutes,
+    cook_time_minutes: row.cook_time_minutes,
+    servings: row.servings,
+    difficulty: row.difficulty,
+    ingredients,
+    instructions: JSON.parse(row.instructions || '[]'),
+  };
+}
 
-  const recipePath = path.join(__dirname, '..', '..', 'recipes.json');
-  if (!fs.existsSync(recipePath)) {
-    recipeData = { metadata: { total_recipes: 0, cuisines: [], dietary_categories: [], schema_version: '1.0' }, recipes: [] };
-    return recipeData;
+function getAllRecipes(limit) {
+  const db = getDb();
+  let rows;
+  if (limit) {
+    rows = db.prepare('SELECT * FROM recipes LIMIT ?').all(limit);
+  } else {
+    rows = db.prepare('SELECT * FROM recipes').all();
   }
-
-  const raw = fs.readFileSync(recipePath, 'utf-8');
-  recipeData = JSON.parse(raw);
-  return recipeData;
-}
-
-function reloadRecipes() {
-  recipeData = null;
-  return loadRecipes();
-}
-
-function getAllRecipes() {
-  return loadRecipes().recipes;
+  return rows.map(assembleRecipe);
 }
 
 function getMetadata() {
-  return loadRecipes().metadata;
+  const db = getDb();
+  const total = db.prepare('SELECT COUNT(*) AS cnt FROM recipes').get().cnt;
+  const cuisines = db.prepare('SELECT DISTINCT origin FROM recipes WHERE origin IS NOT NULL ORDER BY origin').all().map(r => r.origin);
+  const dietary_categories = db.prepare('SELECT DISTINCT tag FROM recipe_dietary ORDER BY tag').all().map(r => r.tag);
+  return {
+    total_recipes: total,
+    cuisines,
+    dietary_categories,
+    schema_version: '1.0',
+  };
 }
 
 function getRecipeById(id) {
-  return getAllRecipes().find(r => r.id === id) || null;
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM recipes WHERE id = ?').get(id);
+  if (!row) return null;
+  return assembleRecipe(row);
 }
 
 function searchRecipes({ query, cuisine, dietary, ingredients, maxPrepTime, maxCookTime, difficulty, limit = 50, offset = 0 }) {
-  let results = getAllRecipes();
-
-  if (query) {
-    const q = query.toLowerCase();
-    results = results.filter(r =>
-      r.name.toLowerCase().includes(q) ||
-      (r.description && r.description.toLowerCase().includes(q)) ||
-      r.ingredients.some(i => i.name.toLowerCase().includes(q))
-    );
-  }
+  const db = getDb();
+  const conditions = [];
+  const params = [];
 
   if (cuisine) {
-    const c = cuisine.toLowerCase();
-    results = results.filter(r => r.origin.toLowerCase() === c);
+    conditions.push('r.origin = ? COLLATE NOCASE');
+    params.push(cuisine);
+  }
+
+  if (maxPrepTime) {
+    conditions.push('r.prep_time_minutes <= ?');
+    params.push(parseInt(maxPrepTime));
+  }
+
+  if (maxCookTime) {
+    conditions.push('r.cook_time_minutes <= ?');
+    params.push(parseInt(maxCookTime));
+  }
+
+  if (difficulty) {
+    conditions.push('r.difficulty = ? COLLATE NOCASE');
+    params.push(difficulty);
+  }
+
+  if (query) {
+    const q = `%${query}%`;
+    conditions.push(`(r.name LIKE ? COLLATE NOCASE OR r.description LIKE ? COLLATE NOCASE
+      OR r.id IN (SELECT recipe_id FROM recipe_ingredients WHERE name LIKE ? COLLATE NOCASE))`);
+    params.push(q, q, q);
   }
 
   if (dietary) {
     const tags = Array.isArray(dietary) ? dietary : [dietary];
-    results = results.filter(r =>
-      tags.every(tag => r.dietary && r.dietary.map(d => d.toLowerCase()).includes(tag.toLowerCase()))
-    );
+    for (const tag of tags) {
+      conditions.push('r.id IN (SELECT recipe_id FROM recipe_dietary WHERE tag = ? COLLATE NOCASE)');
+      params.push(tag);
+    }
   }
 
   if (ingredients) {
     const ingredList = Array.isArray(ingredients) ? ingredients : ingredients.split(',').map(s => s.trim());
-    results = results.filter(r =>
-      ingredList.some(ing =>
-        r.ingredients.some(ri => ri.name.toLowerCase().includes(ing.toLowerCase()))
-      )
-    );
+    const placeholders = ingredList.map(() => 'name LIKE ? COLLATE NOCASE').join(' OR ');
+    conditions.push(`r.id IN (SELECT recipe_id FROM recipe_ingredients WHERE ${placeholders})`);
+    for (const ing of ingredList) {
+      params.push(`%${ing}%`);
+    }
   }
 
-  if (maxPrepTime) {
-    results = results.filter(r => r.prep_time_minutes <= parseInt(maxPrepTime));
-  }
+  const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-  if (maxCookTime) {
-    results = results.filter(r => r.cook_time_minutes <= parseInt(maxCookTime));
-  }
+  const total = db.prepare(`SELECT COUNT(*) AS cnt FROM recipes r ${where}`).get(...params).cnt;
 
-  if (difficulty) {
-    results = results.filter(r => r.difficulty && r.difficulty.toLowerCase() === difficulty.toLowerCase());
-  }
+  const rows = db.prepare(`SELECT r.* FROM recipes r ${where} LIMIT ? OFFSET ?`).all(...params, limit, offset);
 
-  const total = results.length;
-  results = results.slice(offset, offset + limit);
+  const recipes = rows.map(assembleRecipe);
 
-  return { recipes: results, total, limit, offset };
+  return { recipes, total, limit, offset };
 }
 
-module.exports = { loadRecipes, reloadRecipes, getAllRecipes, getMetadata, getRecipeById, searchRecipes };
+module.exports = { getAllRecipes, getMetadata, getRecipeById, searchRecipes };

@@ -4,7 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initialize } = require('./db/database');
-const { loadRecipes } = require('./services/recipeService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,9 +14,6 @@ app.use(express.json());
 
 // Initialize database
 initialize();
-
-// Load recipes
-loadRecipes();
 
 // API Routes (before static files)
 app.use('/api/auth', require('./routes/auth'));
