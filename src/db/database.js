@@ -117,6 +117,24 @@ function initialize() {
       FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS failed_logins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      code TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      attempts INTEGER DEFAULT 0,
+      used INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_memory_user ON user_memory(user_id);
     CREATE INDEX IF NOT EXISTS idx_store_deals_store ON store_deals(store_id);
@@ -126,6 +144,8 @@ function initialize() {
     CREATE INDEX IF NOT EXISTS idx_recipes_difficulty ON recipes(difficulty);
     CREATE INDEX IF NOT EXISTS idx_recipe_dietary_tag ON recipe_dietary(tag);
     CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+    CREATE INDEX IF NOT EXISTS idx_failed_logins_user ON failed_logins(user_id);
+    CREATE INDEX IF NOT EXISTS idx_otp_codes_user ON otp_codes(user_id);
   `);
 
   return db;

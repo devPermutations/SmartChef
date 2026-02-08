@@ -3,7 +3,6 @@
 // ============================================================
 
 const API = '';
-let token = localStorage.getItem('smartchef_token');
 let currentUser = null;
 let recipes = [];
 let metadata = null;
@@ -19,9 +18,12 @@ let currentShoppingRecipeId = null;
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API}${path}`, { ...options, headers });
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
   const data = await res.json();
 
   if (!res.ok) {
@@ -44,6 +46,8 @@ function showRegister() {
   document.getElementById('register-form').classList.remove('hidden');
 }
 
+let pendingOtpSession = null;
+
 async function handleLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
@@ -55,14 +59,65 @@ async function handleLogin() {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    token = data.token;
-    localStorage.setItem('smartchef_token', token);
+
+    if (data.requires_otp) {
+      pendingOtpSession = data.otp_session;
+      showOtpForm(data._dev_otp);
+    } else {
+      currentUser = data.user;
+      enterApp();
+    }
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+function showOtpForm(devOtp) {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('otp-form').classList.remove('hidden');
+  document.getElementById('otp-error').classList.add('hidden');
+  document.getElementById('otp-code').value = '';
+  document.getElementById('otp-code').focus();
+  if (devOtp) {
+    document.getElementById('otp-dev-hint').textContent = `Dev code: ${devOtp}`;
+    document.getElementById('otp-dev-hint').classList.remove('hidden');
+  } else {
+    document.getElementById('otp-dev-hint').classList.add('hidden');
+  }
+}
+
+async function handleVerifyOtp() {
+  const code = document.getElementById('otp-code').value.trim();
+  const errEl = document.getElementById('otp-error');
+  errEl.classList.add('hidden');
+
+  if (!code || !pendingOtpSession) {
+    errEl.textContent = 'Please enter the verification code';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const data = await api('/api/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ otp_session: pendingOtpSession, code })
+    });
+    pendingOtpSession = null;
     currentUser = data.user;
+    document.getElementById('otp-form').classList.add('hidden');
     enterApp();
   } catch (e) {
     errEl.textContent = e.message;
     errEl.classList.remove('hidden');
   }
+}
+
+function backToLogin() {
+  pendingOtpSession = null;
+  document.getElementById('otp-form').classList.add('hidden');
+  showLogin();
 }
 
 async function handleRegister() {
@@ -77,8 +132,6 @@ async function handleRegister() {
       method: 'POST',
       body: JSON.stringify({ name, email, password })
     });
-    token = data.token;
-    localStorage.setItem('smartchef_token', token);
     currentUser = data.user;
     enterApp();
   } catch (e) {
@@ -87,12 +140,12 @@ async function handleRegister() {
   }
 }
 
-function logout() {
-  token = null;
+async function logout() {
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
   currentUser = null;
-  localStorage.removeItem('smartchef_token');
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app-screen').classList.add('hidden');
+  showLogin();
 }
 
 // ============================================================
@@ -127,13 +180,19 @@ function populateFilters() {
   const cuisineSelect = document.getElementById('filter-cuisine');
   cuisineSelect.innerHTML = '<option value="">All Cuisines</option>';
   (metadata.cuisines || []).forEach(c => {
-    cuisineSelect.innerHTML += `<option value="${c}">${c}</option>`;
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    cuisineSelect.appendChild(opt);
   });
 
   const dietarySelect = document.getElementById('filter-dietary');
   dietarySelect.innerHTML = '<option value="">All Diets</option>';
   (metadata.dietary_categories || []).forEach(d => {
-    dietarySelect.innerHTML += `<option value="${d}">${d}</option>`;
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    dietarySelect.appendChild(opt);
   });
 }
 
@@ -653,7 +712,7 @@ async function sendChat() {
         <div class="chat-bubble-ai p-4 max-w-[85%]">
           <div class="text-sm prose prose-sm">${formatMarkdown(result.response)}</div>
           ${result.memories_captured?.length > 0
-            ? `<p class="text-xs text-brand-600 mt-2 italic">Remembered: ${result.memories_captured.join(', ')}</p>`
+            ? `<p class="text-xs text-brand-600 mt-2 italic">Remembered: ${result.memories_captured.map(m => escHtml(m)).join(', ')}</p>`
             : ''}
         </div>
       </div>`;
@@ -671,7 +730,9 @@ async function sendChat() {
 }
 
 function formatMarkdown(text) {
-  return text
+  // Sanitize HTML first to prevent XSS, then apply markdown formatting
+  const safe = escHtml(text);
+  return safe
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/\n\n/g, '</p><p>')
@@ -860,12 +921,16 @@ function escHtml(str) {
 // Initialize
 // ============================================================
 
-// Check for existing session on page load
-if (token) {
-  enterApp();
-} else {
-  document.getElementById('auth-screen').classList.remove('hidden');
-}
+// Check for existing session on page load (cookie-based)
+(async () => {
+  try {
+    const profile = await api('/api/auth/profile');
+    currentUser = profile;
+    enterApp();
+  } catch {
+    document.getElementById('auth-screen').classList.remove('hidden');
+  }
+})();
 
 // Click outside modals to close
 document.getElementById('recipe-modal').addEventListener('click', e => {

@@ -20,7 +20,7 @@ function assembleRecipe(row) {
     servings: row.servings,
     difficulty: row.difficulty,
     ingredients,
-    instructions: JSON.parse(row.instructions || '[]'),
+    instructions: (() => { try { return JSON.parse(row.instructions || '[]'); } catch { return []; } })(),
   };
 }
 

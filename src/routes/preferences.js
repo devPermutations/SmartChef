@@ -1,6 +1,7 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const memoryService = require('../services/memoryService');
+const { VALID_PREFERENCE_TYPES, VALID_PREFERENCE_SOURCES, truncate } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -16,8 +17,16 @@ router.post('/', authMiddleware, (req, res) => {
   if (!type || !value) {
     return res.status(400).json({ error: 'type and value are required' });
   }
+  if (!VALID_PREFERENCE_TYPES.includes(type)) {
+    return res.status(400).json({ error: `type must be one of: ${VALID_PREFERENCE_TYPES.join(', ')}` });
+  }
+  const safeSource = source && VALID_PREFERENCE_SOURCES.includes(source) ? source : 'user_input';
+  const safeValue = truncate(value.trim(), 200);
+  if (!safeValue) {
+    return res.status(400).json({ error: 'value cannot be empty' });
+  }
 
-  const result = memoryService.addPreference(req.userId, type, value, source || 'user_input');
+  const result = memoryService.addPreference(req.userId, type, safeValue, safeSource);
   res.status(201).json(result);
 });
 
@@ -41,7 +50,14 @@ router.post('/memory', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'text is required' });
   }
 
-  const result = memoryService.addMemory(req.userId, text, category || 'context', importance || 5);
+  const safeText = truncate(text.trim(), 1000);
+  if (!safeText) {
+    return res.status(400).json({ error: 'text cannot be empty' });
+  }
+  const safeCategory = ['context', 'preference'].includes(category) ? category : 'context';
+  const safeImportance = Math.max(1, Math.min(10, parseInt(importance, 10) || 5));
+
+  const result = memoryService.addMemory(req.userId, safeText, safeCategory, safeImportance);
   res.status(201).json(result);
 });
 

@@ -6,6 +6,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "seed": "node src/db/seed.js",
+    "build:css": "npx @tailwindcss/cli -i src/input.css -o public/css/styles.css --minify",
+    "build": "npm run build:css",
     "test": "node --test src/tests/"
   },
   "keywords": [],
@@ -15,10 +17,17 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "uuid": "^13.0.0"
+    "nodemailer": "^8.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
   }
 }

@@ -1,6 +1,7 @@
 const express = require('express');
 const recipeService = require('../services/recipeService');
 const { authMiddleware } = require('../middleware/auth');
+const { parsePositiveInt, VALID_FULFILLMENT_TYPES } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -49,24 +50,33 @@ router.get('/history/mine', authMiddleware, (req, res) => {
 router.put('/selections/:id/rate', authMiddleware, (req, res) => {
   const { getDb } = require('../db/database');
   const db = getDb();
-  const { rating } = req.body;
 
-  if (!rating || rating < 1 || rating > 5) {
-    return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  const selectionId = parsePositiveInt(req.params.id);
+  if (!selectionId) {
+    return res.status(400).json({ error: 'Invalid selection ID' });
   }
 
-  const selection = db.prepare('SELECT * FROM meal_selections WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  const r = parseInt(req.body.rating, 10);
+  if (!Number.isInteger(r) || r < 1 || r > 5) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
+  }
+
+  const selection = db.prepare('SELECT * FROM meal_selections WHERE id = ? AND user_id = ?').get(selectionId, req.userId);
   if (!selection) {
     return res.status(404).json({ error: 'Meal selection not found' });
   }
 
-  db.prepare('UPDATE meal_selections SET rating = ? WHERE id = ?').run(rating, req.params.id);
-  res.json({ ...selection, rating });
+  db.prepare('UPDATE meal_selections SET rating = ? WHERE id = ?').run(r, selectionId);
+  res.json({ ...selection, rating: r });
 });
 
 // GET /api/recipes/:id
 router.get('/:id', (req, res) => {
-  const recipe = recipeService.getRecipeById(parseInt(req.params.id));
+  const id = parsePositiveInt(req.params.id);
+  if (!id) {
+    return res.status(400).json({ error: 'Invalid recipe ID' });
+  }
+  const recipe = recipeService.getRecipeById(id);
   if (!recipe) {
     return res.status(404).json({ error: 'Recipe not found' });
   }
@@ -77,8 +87,13 @@ router.get('/:id', (req, res) => {
 router.post('/:id/select', authMiddleware, (req, res) => {
   const { getDb } = require('../db/database');
   const db = getDb();
-  const recipeId = parseInt(req.params.id);
+  const recipeId = parsePositiveInt(req.params.id);
+  if (!recipeId) {
+    return res.status(400).json({ error: 'Invalid recipe ID' });
+  }
+
   const { fulfillment_type } = req.body;
+  const safeFulfillment = VALID_FULFILLMENT_TYPES.includes(fulfillment_type) ? fulfillment_type : 'in_store';
 
   const recipe = recipeService.getRecipeById(recipeId);
   if (!recipe) {
@@ -87,9 +102,9 @@ router.post('/:id/select', authMiddleware, (req, res) => {
 
   const result = db.prepare(
     'INSERT INTO meal_selections (user_id, recipe_id, fulfillment_type) VALUES (?, ?, ?)'
-  ).run(req.userId, recipeId, fulfillment_type || 'in_store');
+  ).run(req.userId, recipeId, safeFulfillment);
 
-  res.status(201).json({ id: result.lastInsertRowid, recipe_id: recipeId, fulfillment_type: fulfillment_type || 'in_store' });
+  res.status(201).json({ id: result.lastInsertRowid, recipe_id: recipeId, fulfillment_type: safeFulfillment });
 });
 
 module.exports = router;

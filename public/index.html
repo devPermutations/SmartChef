@@ -4,18 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SmartChef</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534' }
-          }
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="/css/styles.css">
   <style>
     .chat-bubble-user { background: #dcfce7; border-radius: 18px 18px 4px 18px; }
     .chat-bubble-ai { background: #f3f4f6; border-radius: 18px 18px 18px 4px; }
@@ -56,9 +45,20 @@
         <div id="register-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
         <input id="reg-name" type="text" placeholder="Full Name" class="w-full border rounded-lg p-3 mb-3 focus:ring-2 focus:ring-brand-500 focus:outline-none">
         <input id="reg-email" type="email" placeholder="Email" class="w-full border rounded-lg p-3 mb-3 focus:ring-2 focus:ring-brand-500 focus:outline-none">
-        <input id="reg-password" type="password" placeholder="Password (min 6 chars)" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <input id="reg-password" type="password" placeholder="Password (min 8 chars, upper+lower+number)" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-brand-500 focus:outline-none">
         <button onclick="handleRegister()" class="w-full bg-brand-600 text-white rounded-lg p-3 font-semibold hover:bg-brand-700 transition">Create Account</button>
         <p class="text-center mt-4 text-gray-500">Already have an account? <a href="#" onclick="showLogin()" class="text-brand-600 font-medium">Sign In</a></p>
+      </div>
+
+      <!-- OTP Verification Form -->
+      <div id="otp-form" class="hidden">
+        <h2 class="text-xl font-semibold mb-2">Verify Your Identity</h2>
+        <p class="text-gray-500 text-sm mb-4">Enter the 6-digit code sent to your email</p>
+        <div id="otp-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
+        <div id="otp-dev-hint" class="hidden bg-blue-50 text-blue-600 p-3 rounded-lg mb-4 text-sm font-mono"></div>
+        <input id="otp-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" class="w-full border rounded-lg p-3 mb-4 text-center text-2xl tracking-widest font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none" onkeydown="if(event.key==='Enter')handleVerifyOtp()">
+        <button onclick="handleVerifyOtp()" class="w-full bg-brand-600 text-white rounded-lg p-3 font-semibold hover:bg-brand-700 transition">Verify Code</button>
+        <p class="text-center mt-4 text-gray-500"><a href="#" onclick="backToLogin()" class="text-brand-600 font-medium">Back to Sign In</a></p>
       </div>
     </div>
   </div>

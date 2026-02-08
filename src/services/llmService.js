@@ -62,11 +62,25 @@ async function callAnthropic(messages) {
   return data.content[0].text;
 }
 
+// Demo mode recipe cache (avoid loading 1000 recipes per chat message)
+let _demoRecipeCache = null;
+let _demoCacheTime = 0;
+const DEMO_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getDemoRecipes() {
+  const now = Date.now();
+  if (!_demoRecipeCache || now - _demoCacheTime > DEMO_CACHE_TTL) {
+    _demoRecipeCache = recipeService.getAllRecipes();
+    _demoCacheTime = now;
+  }
+  return _demoRecipeCache;
+}
+
 // Demo mode - smart keyword-based responses using recipe database
 async function callDemo(messages) {
   const lastMsg = messages[messages.length - 1]?.content?.toLowerCase() || '';
   const systemMsg = messages.find(m => m.role === 'system')?.content || '';
-  const allRecipes = recipeService.getAllRecipes();
+  const allRecipes = getDemoRecipes();
 
   // Extract user context from system message
   const hasAllergies = systemMsg.includes('Allergies:');
